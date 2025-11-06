@@ -5,7 +5,7 @@ import type { Player, Card, OddsResult } from '@/lib/types';
 import CardDisplay from '@/components/CardDisplay';
 import CardSelectorGrid from '@/components/CardSelectorGrid';
 import PieChart from '@/components/PieChart';
-import { calculateOdds } from '@/lib/calculator';
+import { calculateOdds, calculateHandStrength } from '@/lib/calculator';
 
 type CardPosition = {
   playerIndex: number;
@@ -48,18 +48,46 @@ export default function Home() {
     return cards;
   }, [players, communityCards]);
 
+  // Determine if we're in single-hand mode
+  const validPlayers = useMemo(() => 
+    players.filter(p => p.cards[0] && p.cards[1]), 
+    [players]
+  );
+  const isSingleHandMode = validPlayers.length === 1;
+
   // Auto-calculate odds when cards change
   useEffect(() => {
     const validPlayers = players.filter(p => p.cards[0] && p.cards[1]);
-    if (validPlayers.length < 2) {
+    
+    if (validPlayers.length === 0) {
       setOdds([]);
       return;
     }
-
+    
     setIsCalculating(true);
     const timer = setTimeout(() => {
-      const result = calculateOdds(players, communityCards, 2000);
-      setOdds(result);
+      if (validPlayers.length === 1) {
+        // Single hand mode - calculate against random opponents
+        const player = validPlayers[0];
+        const numOpponents = players.length - 1; // Use total players as opponent count
+        
+        const result = calculateHandStrength(
+          [player.cards[0]!, player.cards[1]!],
+          communityCards,
+          numOpponents,
+          2000
+        );
+        setOdds([{
+          playerId: player.id,
+          playerName: `${player.name} vs ${numOpponents} opponent${numOpponents > 1 ? 's' : ''}`,
+          winPercentage: result.winPercentage,
+          tiePercentage: result.tiePercentage
+        }]);
+      } else {
+        // Multi-player mode - compare known hands
+        const result = calculateOdds(players, communityCards, 2000);
+        setOdds(result);
+      }
       setIsCalculating(false);
     }, 100);
 
@@ -239,11 +267,11 @@ export default function Home() {
                         {hasCompleteHand && playerOdds && (
                           <div className="text-right">
                             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                              {playerOdds.winPercentage.toFixed(1)}%
+                              {(playerOdds.winPercentage + playerOdds.tiePercentage).toFixed(1)}%
                             </div>
                             {playerOdds.tiePercentage > 0.1 && (
                               <div className="text-xs text-gray-600 dark:text-gray-400">
-                                Tie: {playerOdds.tiePercentage.toFixed(1)}%
+                                (Win: {playerOdds.winPercentage.toFixed(1)}% + Tie: {playerOdds.tiePercentage.toFixed(1)}%)
                               </div>
                             )}
                           </div>
@@ -331,19 +359,31 @@ export default function Home() {
               data={
                 odds.length === 0 
                   ? [{ label: 'Tie', value: 100, color: '#64748b' }] // Show 100% tie when no data
-                  : [
-                      ...odds.map((playerOdds, index) => ({
+                  : isSingleHandMode
+                    ? [
+                        // Single hand mode: show player win, tie, and opponent win
+                        {
+                          label: odds[0].playerName.split(' vs ')[0], // Just the player name
+                          value: odds[0].winPercentage,
+                          color: PLAYER_COLORS[0]
+                        },
+                        ...(odds[0].tiePercentage > 0.1 ? [{
+                          label: 'Tie',
+                          value: odds[0].tiePercentage,
+                          color: '#64748b' // Slate gray
+                        }] : []),
+                        {
+                          label: 'Opponent Wins',
+                          value: 100 - odds[0].winPercentage - odds[0].tiePercentage,
+                          color: '#DC2626' // Red for opponent
+                        }
+                      ]
+                    : odds.map((playerOdds, index) => ({
+                        // Multi-player mode: show each player's total equity
                         label: playerOdds.playerName,
-                        value: playerOdds.winPercentage, // Only wins, not ties
+                        value: playerOdds.winPercentage + playerOdds.tiePercentage,
                         color: PLAYER_COLORS[players.findIndex(p => p.id === playerOdds.playerId) % PLAYER_COLORS.length]
-                      })),
-                      // Add tie percentage if any
-                      ...(odds.some(o => o.tiePercentage > 0.1) ? [{
-                        label: 'Tie',
-                        value: odds[0].tiePercentage,
-                        color: '#64748b' // Slate gray
-                      }] : [])
-                    ]
+                      }))
               }
             />
           </div>

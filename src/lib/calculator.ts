@@ -46,6 +46,82 @@ export function calculateOdds(
   }));
 }
 
+// New function: Calculate win probability against random opponents
+export function calculateHandStrength(
+  playerCards: [Card, Card],
+  communityCards: (Card | null)[],
+  numOpponents: number = 1,
+  simulations: number = 2000
+): { winPercentage: number; tiePercentage: number } {
+  const usedCards: Card[] = [playerCards[0], playerCards[1]];
+  for (const card of communityCards) {
+    if (card) usedCards.push(card);
+  }
+
+  let wins = 0;
+  let ties = 0;
+
+  const fullDeck = createDeck();
+  const availableDeck = fullDeck.filter(card => 
+    !usedCards.some(used => cardsEqual(card, used))
+  );
+
+  for (let sim = 0; sim < simulations; sim++) {
+    const shuffled = shuffleArray(availableDeck);
+    let deckIndex = 0;
+
+    // Complete the community cards
+    const finalCommunity: Card[] = [];
+    for (let i = 0; i < 5; i++) {
+      if (communityCards[i]) {
+        finalCommunity.push(communityCards[i]!);
+      } else {
+        finalCommunity.push(shuffled[deckIndex++]);
+      }
+    }
+
+    // Deal random opponent hands
+    const opponents: [Card, Card][] = [];
+    for (let i = 0; i < numOpponents; i++) {
+      opponents.push([shuffled[deckIndex++], shuffled[deckIndex++]]);
+    }
+
+    // Evaluate player's hand
+    const playerHand = evalHand([
+      cardToPokerEvaluatorString(playerCards[0]),
+      cardToPokerEvaluatorString(playerCards[1]),
+      ...finalCommunity.map(cardToPokerEvaluatorString)
+    ]);
+
+    // Evaluate opponent hands
+    const opponentHands = opponents.map(oppCards => {
+      try {
+        return evalHand([
+          cardToPokerEvaluatorString(oppCards[0]),
+          cardToPokerEvaluatorString(oppCards[1]),
+          ...finalCommunity.map(cardToPokerEvaluatorString)
+        ]);
+      } catch (e) {
+        return { value: 10000, rank: -1, name: 'High Card' as const, cards: [] };
+      }
+    });
+
+    // Compare hands
+    const bestOpponentValue = Math.min(...opponentHands.map(h => h.value));
+    
+    if (playerHand.value < bestOpponentValue) {
+      wins++;
+    } else if (playerHand.value === bestOpponentValue) {
+      ties++;
+    }
+  }
+
+  return {
+    winPercentage: (wins / simulations) * 100,
+    tiePercentage: (ties / simulations) * 100
+  };
+}
+
 function runSimulation(
   players: Player[],
   communityCards: (Card | null)[],
