@@ -6,6 +6,7 @@ import CardDisplay from '@/components/CardDisplay';
 import CardSelectorGrid from '@/components/CardSelectorGrid';
 import PieChart from '@/components/PieChart';
 import ThemeToggle from '@/components/ThemeToggle';
+import GitHubLink from '@/components/GitHubLink';
 import { calculateOdds, calculateHandStrength } from '@/lib/calculator';
 
 type CardPosition = {
@@ -16,17 +17,16 @@ type CardPosition = {
   cardIndex: number;
 } | null;
 
-// Player colors - redesigned palette with distinct colors
 const PLAYER_COLORS = [
-  '#2563EB', // Bright Blue
-  '#DC2626', // Bright Red  
-  '#059669', // Emerald Green
-  '#D97706', // Orange
-  '#7C3AED', // Violet
-  '#DB2777', // Hot Pink
-  '#0891B2', // Cyan
-  '#EA580C', // Deep Orange
-  '#4F46E5', // Indigo
+  '#2563EB',
+  '#DC2626',
+  '#059669',
+  '#D97706',
+  '#7C3AED',
+  '#DB2777',
+  '#0891B2',
+  '#EA580C',
+  '#4F46E5',
 ];
 
 export default function Home() {
@@ -40,7 +40,6 @@ export default function Home() {
   const [selectedPosition, setSelectedPosition] = useState<CardPosition>({ playerIndex: 0, cardIndex: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load cached data from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -63,7 +62,6 @@ export default function Home() {
     }
   }, []);
 
-  // Save players to localStorage whenever they change
   useEffect(() => {
     if (isLoaded && typeof window !== 'undefined') {
       try {
@@ -74,7 +72,6 @@ export default function Home() {
     }
   }, [players, isLoaded]);
 
-  // Save community cards to localStorage whenever they change
   useEffect(() => {
     if (isLoaded && typeof window !== 'undefined') {
       try {
@@ -85,7 +82,6 @@ export default function Home() {
     }
   }, [communityCards, isLoaded]);
 
-  // Get all used cards
   const usedCards = useMemo(() => {
     const cards: (Card | null)[] = [];
     for (const player of players) {
@@ -95,14 +91,12 @@ export default function Home() {
     return cards;
   }, [players, communityCards]);
 
-  // Determine if we're in single-hand mode
   const validPlayers = useMemo(() => 
     players.filter(p => p.cards[0] && p.cards[1]), 
     [players]
   );
   const isSingleHandMode = validPlayers.length === 1;
 
-  // Auto-calculate odds when cards change
   useEffect(() => {
     const validPlayers = players.filter(p => p.cards[0] && p.cards[1]);
     
@@ -114,15 +108,13 @@ export default function Home() {
     setIsCalculating(true);
     const timer = setTimeout(() => {
       if (validPlayers.length === 1) {
-        // Single hand mode - calculate against random opponents
         const player = validPlayers[0];
-        const numOpponents = players.length - 1; // Use total players as opponent count
+        const numOpponents = players.length - 1;
         
         const result = calculateHandStrength(
           [player.cards[0]!, player.cards[1]!],
           communityCards,
           numOpponents,
-          2000
         );
         setOdds([{
           playerId: player.id,
@@ -131,8 +123,7 @@ export default function Home() {
           tiePercentage: result.tiePercentage
         }]);
       } else {
-        // Multi-player mode - compare known hands
-        const result = calculateOdds(players, communityCards, 2000);
+        const result = calculateOdds(players, communityCards);
         setOdds(result);
       }
       setIsCalculating(false);
@@ -148,13 +139,11 @@ export default function Home() {
       const newCommunityCards = [...communityCards];
       newCommunityCards[selectedPosition.cardIndex] = card;
       setCommunityCards(newCommunityCards);
-      // Move to next empty slot after update
       setTimeout(() => findNextEmptySlot(newCommunityCards, players), 0);
     } else if ('playerIndex' in selectedPosition) {
       const newPlayers = [...players];
       newPlayers[selectedPosition.playerIndex].cards[selectedPosition.cardIndex] = card;
       setPlayers(newPlayers);
-      // Move to next empty slot after update
       setTimeout(() => findNextEmptySlot(communityCards, newPlayers), 0);
     }
   };
@@ -172,12 +161,10 @@ export default function Home() {
       setPlayers(newPlayers);
     }
     
-    // Select the slot that was just cleared
     setSelectedPosition(position);
   };
 
   const findNextEmptySlot = (community: (Card | null)[] = communityCards, playersList: Player[] = players) => {
-    // Check player cards first
     for (let i = 0; i < playersList.length; i++) {
       if (!playersList[i].cards[0]) {
         setSelectedPosition({ playerIndex: i, cardIndex: 0 });
@@ -189,7 +176,6 @@ export default function Home() {
       }
     }
     
-    // Check community cards
     for (let i = 0; i < community.length; i++) {
       if (!community[i]) {
         setSelectedPosition({ type: 'community', cardIndex: i });
@@ -197,7 +183,6 @@ export default function Home() {
       }
     }
     
-    // If all slots filled, clear selection
     setSelectedPosition(null);
   };
 
@@ -213,7 +198,6 @@ export default function Home() {
     setOdds([]);
     setSelectedPosition({ playerIndex: 0, cardIndex: 0 });
     
-    // Clear localStorage cache
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('poker-odds-players');
@@ -239,45 +223,28 @@ export default function Home() {
     const newPlayers = players.filter((_, i) => i !== index);
     setPlayers(newPlayers);
     
-    // Reset selection to first player's first card after removal
     setSelectedPosition({ playerIndex: 0, cardIndex: 0 });
   };
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Theme Toggle */}
       <div className="fixed top-4 left-4 z-50">
         <ThemeToggle />
       </div>
 
-      {/* GitHub Link */}
-      <a
-        href="https://github.com/alfredzimmer/poker-odds"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors shadow-lg"
-      >
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-          <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
-        </svg>
-        <span className="font-medium">GitHub</span>
-      </a>
+      <GitHubLink />
 
       <main className="container mx-auto px-4 py-8 max-w-[1800px]">
-        {/* Header */}
         <div className="mb-6">
           <div className="text-center mb-2">
             <h1 className="text-4xl md:text-5xl font-bold bg-linear-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent mb-2">
               Poker Equity Calculator
             </h1>
           </div>
-          {/* <div className="h-1 w-32 mx-auto bg-linear-to-r from-blue-600 to-purple-600 rounded-full"></div> */}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left Side - Players & Community Cards */}
           <div className="space-y-3">
-            {/* Players Section */}
             <div className="space-y-3">
               {players.map((player, playerIndex) => {
                 const playerOdds = odds.find(o => o.playerId === player.id);
@@ -359,7 +326,6 @@ export default function Home() {
               })}
             </div>
 
-            {/* Community Cards */}
             <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 shadow-sm">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white min-w-[90px]">
@@ -388,7 +354,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Controls */}
             <div className="flex gap-2">
               <button
                 onClick={addPlayer}
@@ -406,7 +371,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Side - Card Selector */}
           <div className="space-y-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 shadow-sm p-4">
               <p className="text-center text-base text-gray-700 dark:text-gray-300 mb-3 font-semibold">
@@ -422,42 +386,38 @@ export default function Home() {
               />
             </div>
 
-            {/* Pie Chart - Always visible */}
             <PieChart
               data={
                 odds.length === 0 
-                  ? [{ label: 'Tie', value: 100, color: '#64748B' }] // Gray for tie when no data
+                  ? [{ label: 'Tie', value: 100, color: '#64748B' }]
                   : isSingleHandMode
                     ? [
-                        // Single hand mode: show player win, tie, and opponent win
                         {
-                          label: odds[0].playerName.split(' vs ')[0], // Just the player name
+                          label: odds[0].playerName.split(' vs ')[0],
                           value: odds[0].winPercentage,
                           color: PLAYER_COLORS[0]
                         },
                         ...(odds[0].tiePercentage > 0.1 ? [{
                           label: 'Tie',
                           value: odds[0].tiePercentage,
-                          color: '#64748B' // Slate gray
+                          color: '#64748B'
                         }] : []),
                         {
                           label: 'Opponent Wins',
                           value: 100 - odds[0].winPercentage - odds[0].tiePercentage,
-                          color: '#475569' // Darker slate - distinct from tie gray
+                          color: '#475569'
                         }
                       ]
                     : [
-                        // Multi-player mode: show each player's WIN only, plus separate tie
                         ...odds.map((playerOdds, index) => ({
                           label: playerOdds.playerName,
-                          value: playerOdds.winPercentage, // Only wins, not equity
+                          value: playerOdds.winPercentage,
                           color: PLAYER_COLORS[players.findIndex(p => p.id === playerOdds.playerId) % PLAYER_COLORS.length]
                         })),
-                        // Add shared tie segment if any
                         ...(odds.length > 0 && odds[0].tiePercentage > 0.1 ? [{
                           label: 'Tie',
                           value: odds[0].tiePercentage,
-                          color: '#64748B' // Slate gray
+                          color: '#64748B'
                         }] : [])
                       ]
               }

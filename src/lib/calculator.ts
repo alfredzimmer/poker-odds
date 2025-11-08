@@ -10,9 +10,8 @@ interface SimulationResult {
 export function calculateOdds(
   players: Player[],
   communityCards: (Card | null)[],
-  simulations = 10000
+  simulations = 50000
 ): OddsResult[] {
-  // Filter out players with incomplete hands
   const validPlayers = players.filter(p => p.cards[0] && p.cards[1]);
   
   if (validPlayers.length < 2) {
@@ -24,7 +23,6 @@ export function calculateOdds(
     }));
   }
 
-  // Get all cards currently in use
   const usedCards: Card[] = [];
   for (const player of validPlayers) {
     if (player.cards[0]) usedCards.push(player.cards[0]);
@@ -34,10 +32,8 @@ export function calculateOdds(
     if (card) usedCards.push(card);
   }
 
-  // Run Monte Carlo simulation
   const result = runSimulation(validPlayers, communityCards, usedCards, simulations);
 
-  // Calculate percentages
   return validPlayers.map((player, index) => ({
     playerId: player.id,
     playerName: player.name,
@@ -46,12 +42,11 @@ export function calculateOdds(
   }));
 }
 
-// New function: Calculate win probability against random opponents
 export function calculateHandStrength(
   playerCards: [Card, Card],
   communityCards: (Card | null)[],
   numOpponents: number = 1,
-  simulations: number = 2000
+  simulations: number = 50000
 ): { winPercentage: number; tiePercentage: number } {
   const usedCards: Card[] = [playerCards[0], playerCards[1]];
   for (const card of communityCards) {
@@ -70,7 +65,6 @@ export function calculateHandStrength(
     const shuffled = shuffleArray(availableDeck);
     let deckIndex = 0;
 
-    // Complete the community cards
     const finalCommunity: Card[] = [];
     for (let i = 0; i < 5; i++) {
       if (communityCards[i]) {
@@ -80,20 +74,17 @@ export function calculateHandStrength(
       }
     }
 
-    // Deal random opponent hands
     const opponents: [Card, Card][] = [];
     for (let i = 0; i < numOpponents; i++) {
       opponents.push([shuffled[deckIndex++], shuffled[deckIndex++]]);
     }
 
-    // Evaluate player's hand
     const playerHand = evalHand([
       cardToPokerEvaluatorString(playerCards[0]),
       cardToPokerEvaluatorString(playerCards[1]),
       ...finalCommunity.map(cardToPokerEvaluatorString)
     ]);
 
-    // Evaluate opponent hands
     const opponentHands = opponents.map(oppCards => {
       try {
         return evalHand([
@@ -106,7 +97,6 @@ export function calculateHandStrength(
       }
     });
 
-    // Compare hands
     const bestOpponentValue = Math.min(...opponentHands.map(h => h.value));
     
     if (playerHand.value < bestOpponentValue) {
@@ -131,7 +121,6 @@ function runSimulation(
   const wins = new Array(players.length).fill(0);
   const ties = new Array(players.length).fill(0);
 
-  // Create available deck
   const fullDeck = createDeck();
   const availableDeck = fullDeck.filter(card => 
     !usedCards.some(used => cardsEqual(card, used))
@@ -140,7 +129,6 @@ function runSimulation(
   for (let sim = 0; sim < simulations; sim++) {
     const shuffled = shuffleArray(availableDeck);
     
-    // Complete the community cards
     const finalCommunity: Card[] = [];
     let deckIndex = 0;
     
@@ -152,7 +140,6 @@ function runSimulation(
       }
     }
 
-    // Evaluate each player's hand
     const handStrengths = players.map(player => {
       try {
         const playerCards = [
@@ -164,11 +151,10 @@ function runSimulation(
         
         return evalHand(allCards);
       } catch (e) {
-        return { value: 10000, rank: -1, name: 'High Card' as const, cards: [] }; // Worst possible hand
+        return { value: 10000, rank: -1, name: 'High Card' as const, cards: [] };
       }
     });
 
-    // Find winner(s) - lower value is better in poker-evaluator
     const bestValue = Math.min(...handStrengths.map(h => h.value));
     const winners = handStrengths
       .map((h, i) => ({ strength: h.value, index: i }))
@@ -177,7 +163,6 @@ function runSimulation(
     if (winners.length === 1) {
       wins[winners[0].index]++;
     } else {
-      // It's a tie
       for (const winner of winners) {
         ties[winner.index]++;
       }
