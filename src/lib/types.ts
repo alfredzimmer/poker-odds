@@ -17,6 +17,7 @@ export interface OddsResult {
   playerName: string;
   winPercentage: number;
   tiePercentage: number;
+  expectedReturn?: number;
 }
 
 export interface GameState {
