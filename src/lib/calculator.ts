@@ -10,19 +10,17 @@ interface SimulationResult {
 export function calculateOdds(
   players: Player[],
   communityCards: (Card | null)[],
-  simulations = 10000,
-  betAmount = 100 // 💰 Default $100 per player
+  simulations = 10000
 ): OddsResult[] {
   // Filter out players with incomplete hands
   const validPlayers = players.filter(p => p.cards[0] && p.cards[1]);
-
+  
   if (validPlayers.length < 2) {
     return players.map(p => ({
       playerId: p.id,
       playerName: p.name,
       winPercentage: 0,
-      tiePercentage: 0,
-      expectedReturn: 0
+      tiePercentage: 0
     }));
   }
 
@@ -39,22 +37,13 @@ export function calculateOdds(
   // Run Monte Carlo simulation
   const result = runSimulation(validPlayers, communityCards, usedCards, simulations);
 
-  // Calculate percentages and expected return
-  return validPlayers.map((player, index) => {
-    const winPct = (result.wins[index] / simulations) * 100;
-    const tiePct = (result.ties[index] / simulations) * 100;
-
-    const totalPlayers = validPlayers.length;
-    const EV = ((winPct + tiePct / 2) / 100) * (betAmount * totalPlayers) - betAmount;
-
-    return {
-      playerId: player.id,
-      playerName: player.name,
-      winPercentage: winPct,
-      tiePercentage: tiePct,
-      expectedReturn: EV
-    };
-  });
+  // Calculate percentages
+  return validPlayers.map((player, index) => ({
+    playerId: player.id,
+    playerName: player.name,
+    winPercentage: (result.wins[index] / simulations) * 100,
+    tiePercentage: (result.ties[index] / simulations) * 100
+  }));
 }
 
 // New function: Calculate win probability against random opponents
@@ -73,7 +62,7 @@ export function calculateHandStrength(
   let ties = 0;
 
   const fullDeck = createDeck();
-  const availableDeck = fullDeck.filter(card =>
+  const availableDeck = fullDeck.filter(card => 
     !usedCards.some(used => cardsEqual(card, used))
   );
 
@@ -119,7 +108,7 @@ export function calculateHandStrength(
 
     // Compare hands
     const bestOpponentValue = Math.min(...opponentHands.map(h => h.value));
-
+    
     if (playerHand.value < bestOpponentValue) {
       wins++;
     } else if (playerHand.value === bestOpponentValue) {
@@ -144,17 +133,17 @@ function runSimulation(
 
   // Create available deck
   const fullDeck = createDeck();
-  const availableDeck = fullDeck.filter(card =>
+  const availableDeck = fullDeck.filter(card => 
     !usedCards.some(used => cardsEqual(card, used))
   );
 
   for (let sim = 0; sim < simulations; sim++) {
     const shuffled = shuffleArray(availableDeck);
-
+    
     // Complete the community cards
     const finalCommunity: Card[] = [];
     let deckIndex = 0;
-
+    
     for (let i = 0; i < 5; i++) {
       if (communityCards[i]) {
         finalCommunity.push(communityCards[i]!);
@@ -172,14 +161,14 @@ function runSimulation(
         ];
         const communityCardsStr = finalCommunity.map(cardToPokerEvaluatorString);
         const allCards = [...playerCards, ...communityCardsStr];
-
+        
         return evalHand(allCards);
       } catch (e) {
-        return { value: 10000, rank: -1, name: 'High Card' as const, cards: [] };
+        return { value: 10000, rank: -1, name: 'High Card' as const, cards: [] }; // Worst possible hand
       }
     });
 
-    // Find winner(s)
+    // Find winner(s) - lower value is better in poker-evaluator
     const bestValue = Math.min(...handStrengths.map(h => h.value));
     const winners = handStrengths
       .map((h, i) => ({ strength: h.value, index: i }))
@@ -188,6 +177,7 @@ function runSimulation(
     if (winners.length === 1) {
       wins[winners[0].index]++;
     } else {
+      // It's a tie
       for (const winner of winners) {
         ties[winner.index]++;
       }
