@@ -13,20 +13,20 @@ interface PieChartProps {
 
 export default function PieChart({ data }: PieChartProps) {
   const [mounted, setMounted] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  // Ensure component only renders on client
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Transform data for Recharts
   const chartData = data.map(item => ({
     name: item.label,
     value: item.value,
     color: item.color
   }));
 
-  // Custom label renderer for the legend
+  const hasFullCircle = chartData.length === 1 || chartData.some(item => item.value >= 99.9);
+
   const renderLegend = (props: any) => {
     const { payload } = props;
     if (!payload || payload.length === 0) return null;
@@ -34,25 +34,38 @@ export default function PieChart({ data }: PieChartProps) {
     return (
       <div className="flex flex-col gap-3">
         {payload.map((entry: any, index: number) => {
-          // Find the corresponding data from chartData
           const dataItem = chartData.find(d => d.name === entry.value);
           if (!dataItem) return null;
+          
+          const isActive = activeIndex === index;
           
           return (
             <div
               key={`legend-${index}`}
-              className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded min-w-[200px]"
+              className={`flex items-center justify-between px-4 py-3 rounded min-w-[200px] cursor-pointer transition-all duration-200 ${
+                isActive 
+                  ? 'bg-gray-200 dark:bg-gray-600 scale-105 shadow-lg' 
+                  : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-650'
+              }`}
+              onMouseEnter={() => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
             >
               <div className="flex items-center gap-3">
                 <div
-                  className="w-4 h-4 rounded-full shrink-0"
+                  className={`w-4 h-4 rounded-full shrink-0 transition-transform duration-200 ${
+                    isActive ? 'scale-125' : ''
+                  }`}
                   style={{ backgroundColor: entry.color }}
                 />
-                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <span className={`text-sm font-medium text-gray-900 dark:text-white truncate ${
+                  isActive ? 'font-bold' : ''
+                }`}>
                   {entry.value}
                 </span>
               </div>
-              <span className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-3">
+              <span className={`text-sm font-bold text-gray-700 dark:text-gray-300 ml-3 ${
+                isActive ? 'text-gray-900 dark:text-white' : ''
+              }`}>
                 {dataItem.value.toFixed(1)}%
               </span>
             </div>
@@ -81,16 +94,30 @@ export default function PieChart({ data }: PieChartProps) {
                 cy="50%"
                 innerRadius={70}
                 outerRadius={120}
-                paddingAngle={2}
+                paddingAngle={hasFullCircle ? 0 : 2}
                 dataKey="value"
                 animationBegin={0}
                 animationDuration={800}
                 animationEasing="ease-out"
                 stroke="none"
+                onMouseEnter={(_, index) => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(null)}
               >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                ))}
+                {chartData.map((entry, index) => {
+                  const isActive = activeIndex === index;
+                  return (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.color} 
+                      stroke="none"
+                      opacity={activeIndex === null ? 1 : isActive ? 1 : 0.4}
+                      style={{
+                        filter: isActive ? 'brightness(1.1)' : 'none',
+                        transition: 'opacity 0.2s ease, filter 0.2s ease'
+                      }}
+                    />
+                  );
+                })}
               </Pie>
             </RechartsPie>
           </ResponsiveContainer>
